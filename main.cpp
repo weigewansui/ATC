@@ -6,6 +6,7 @@
 #include <stack>
 #include <queue>
 #include <set>
+#include <algorithm>
 
 #define MAX_NAME_LEN 1000
 using namespace std;
@@ -20,6 +21,7 @@ class Scheduler{
   map<string, bool> runned_map;
   map< string, list<string> > dependency_map;
   map< string, set<string> > fathers_map;
+  list<string> to_run_list;
   int num_tasks;
   int num_actors;
   bool* actor_status;
@@ -67,6 +69,7 @@ void Scheduler::ParseFile(const char* fileName) {
     // split each line
     char* tmp = strtok(buff, ":, ");
     string current_task_name = string(tmp);
+    to_run_list.push_back(string(tmp));
     list<string> curr_dependency;
     while(tmp != NULL) {
       tmp = strtok(NULL, ":, ");
@@ -94,6 +97,7 @@ void Scheduler::print_father_map(void) {
     }
   }
 }
+
 void Scheduler::print_dependency_map(void) {
   map< string, list<string> >::iterator itr;
   for(itr = dependency_map.begin(); itr != dependency_map.end(); itr++) {
@@ -113,31 +117,10 @@ void print_list(list<string> l) {
   cout << endl;
 }
 void Scheduler::find_leaf_util(string name, int& queueNo) {
-  // if(dependency_map[name].empty()) {
-  //   // cout << "LEAF: " << name << endl;
-  //   actor_queues[queueNo].push(name);
-  //   // cout << __LINE__ << endl;
-  //   for(set<string>::iterator itr = fathers_map[name].begin(); itr != fathers_map[name].end(); itr ++) {
-  //     cout << "removing dependency " << name << " from    ";
-  //     print_list(dependency_map[*itr]);
-  //     runned_map[name] = true;
-  //     // dependency_map[*itr].remove(name);
-  //     // cout <<"after removel :";
-  //     // print_list(dependency_map[*itr]);
-  //
-  //   }
-  //
-  //   if(queueNo == num_actors - 1) {
-  //     queueNo = 0;
-  //   } else {
-  //     queueNo ++;
-  //   }
-  //
-  // } else {
     map< string, list<string> > tmp = dependency_map; // list remove will cause pointer issue so copy it for iteration
     bool leaf = true;
     for(list<string>::iterator itr = tmp[name].begin(); itr != tmp[name].end(); itr ++) {
-      if(runned_map[*itr]) continue;
+      if(find(to_run_list.begin(), to_run_list.end(), *itr) == to_run_list.end()) continue;
       leaf = false;
       cout << "Checking task: " << *itr <<endl;
       find_leaf_util(*itr, queueNo);
@@ -145,17 +128,14 @@ void Scheduler::find_leaf_util(string name, int& queueNo) {
     if(leaf) {
         cout << "LEAF: " << name << endl;
         cout << "pushing task " << name << " to Actor " << queueNo <<endl;
-
-
         actor_queues[queueNo].push(name);
-        runned_map[name] = true;
+        to_run_list.remove(name);
         if(queueNo == num_actors - 1) {
           queueNo = 0;
         } else {
           queueNo ++;
         }
     }
-  // }
 }
 
 void Scheduler::print_actor_schedule(void) {
@@ -170,60 +150,13 @@ void Scheduler::print_actor_schedule(void) {
 
 void Scheduler::get_task(void) {
   int queueNo = 0;
-  find_leaf_util("task_name", queueNo);
+  while(!to_run_list.empty())
+    find_leaf_util("task_name", queueNo);
 }
 
-void Scheduler::plan_tasks(string taskName, stack<task_t>& taskStack, int depth) {
-  task_t aaa = {.name=taskName, .depth=depth};
-  taskStack.push(aaa);
-  // runned_map[taskName] = true; // push all tasks into a stack, not considering task has been excuted
-  if(dependency_map[taskName].empty()) {
-    return;
-  } else {
-    for(list<string>::iterator itr = dependency_map[taskName].begin(); itr != dependency_map[taskName].end(); itr ++) {
-      // if(!runned_map[*itr]) {
-        plan_tasks(*itr, taskStack, depth+1);
-      // }
-    }
-  }
-}
-
-void printStack(stack<string> taskStack) {
-  stack<string> a = taskStack;
-  while(!a.empty()) {
-    cout << a.top() << endl;
-    a.pop();
-  }
-}
-
-void Scheduler::plan_tasks(void) {
-  stack<task_t> taskStack;
-  int depth = 0;
-  plan_tasks("task_name", taskStack, depth);
-  queue<task_t> taskQueue;
-
-  while(!taskStack.empty()) {
-    task_t tmp = taskStack.top();
-    // if(!runned_map[tmp.name])
-    {
-      runned_map[tmp.name] = true;
-      taskQueue.push(tmp);
-    }
-    taskStack.pop();
-  }
-
-  while(!taskQueue.empty()) {
-    // cout << taskQueue.front().name << " depth: " << taskQueue.front().depth << endl;
-    taskQueue.pop();
-  }
-}
 
 int main() {
   Scheduler a(2, "test.txt");
-  // a.ParseFile("test.txt");
-  // a.print_dependency_map();
-  // a.plan_tasks();
-  // a.print_father_map();
   a.get_task();
   a.print_actor_schedule();
 }
